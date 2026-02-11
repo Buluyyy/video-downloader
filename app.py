@@ -67,13 +67,14 @@ def download_video():
                 }]
             })
 
-        # 🎬 MP4 MODE (SUPER STABLE)
+        # 🎬 MP4 MODE (PALING STABIL)
         else:
             ydl_opts.update({
-                # Ambil video+audio terbaik apapun
-                "format": "bestvideo+bestaudio/best",
-                # Paksa merge jadi mp4
-                "merge_output_format": "mp4"
+                "format": "best",
+                "postprocessors": [{
+                    "key": "FFmpegVideoConvertor",
+                    "preferedformat": "mp4"
+                }]
             })
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
