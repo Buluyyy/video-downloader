@@ -9,13 +9,12 @@ app = Flask(__name__)
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# 🔥 Di Railway (Docker Linux), ffmpeg ada di sini
-FFMPEG_LOCATION = "/usr/bin"
+FFMPEG_LOCATION = "/usr/bin"  # Railway Linux path
 
 
 def sanitize_filename(title):
     title = re.sub(r'[\\/*?:"<>|]', "", title)
-    return title[:150]  # batasi panjang nama file
+    return title[:150]
 
 
 @app.route("/")
@@ -33,27 +32,32 @@ def download_video():
         return jsonify({"success": False, "message": "URL tidak ditemukan"}), 400
 
     try:
-        # Ambil info video dulu
-        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
+        # Ambil judul dulu
+        with yt_dlp.YoutubeDL({
+            "quiet": True,
+            "cookiefile": "cookies.txt"
+        }) as ydl:
             info = ydl.extract_info(url, download=False)
             raw_title = info.get("title", "video")
 
         title = sanitize_filename(raw_title)
-
-        # Tambahkan UUID supaya tidak bentrok nama file
         unique_id = str(uuid.uuid4())[:8]
         base_filename = f"{title}_{unique_id}"
 
-        output_template = os.path.join(DOWNLOAD_FOLDER, f"{base_filename}.%(ext)s")
+        output_template = os.path.join(
+            DOWNLOAD_FOLDER,
+            f"{base_filename}.%(ext)s"
+        )
 
         ydl_opts = {
             "outtmpl": output_template,
             "noplaylist": True,
             "quiet": True,
-            "ffmpeg_location": FFMPEG_LOCATION
+            "ffmpeg_location": FFMPEG_LOCATION,
+            "cookiefile": "cookies.txt"
         }
 
-        # 🎵 MODE MP3
+        # 🎵 MP3 MODE
         if format_type == "mp3":
             ydl_opts.update({
                 "format": "bestaudio/best",
@@ -64,14 +68,14 @@ def download_video():
                 }]
             })
 
-        # 🎬 MODE MP4 (PAKSA MP4)
+        # 🎬 MP4 MODE (PAKSA MP4)
         else:
             ydl_opts.update({
                 "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
                 "merge_output_format": "mp4"
             })
 
-        # 🔥 Proses download
+        # Download
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
@@ -85,7 +89,7 @@ def download_video():
 
         return jsonify({
             "success": False,
-            "message": "File tidak ditemukan setelah download"
+            "message": "File tidak ditemukan"
         }), 500
 
     except Exception as e:
@@ -101,6 +105,5 @@ def serve_file(filename):
 
 
 if __name__ == "__main__":
-    # Railway pakai PORT environment variable
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
