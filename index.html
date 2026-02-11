@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP4/MP3Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.2);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-black to-gray-800 min-h-screen flex items-center justify-center text-white">
+
+    <div class="bg-white/10 backdrop-blur-xl shadow-2xl rounded-3xl p-10 w-full max-w-xl border border-white/20">
+        <h1 class="text-3xl font-bold text-center mb-8 tracking-wide">MP4/MP3Downloader</h1>
+
+        <div class="mb-4">
+            <label class="text-sm opacity-80">Platform</label>
+            <select id="platform" class="w-full mt-2 p-3 rounded-xl bg-black/40 border border-white/20 focus:outline-none">
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram</option>
+                <option value="youtube">YouTube</option>
+                <option value="x">X (Twitter)</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="text-sm opacity-80">Format</label>
+            <select id="format" class="w-full mt-2 p-3 rounded-xl bg-black/40 border border-white/20 focus:outline-none">
+                <option value="mp4">MP4 (Video)</option>
+                <option value="mp3">MP3 (Audio)</option>
+            </select>
+        </div>
+
+        <div class="mb-6">
+            <label class="text-sm opacity-80">Link</label>
+            <input type="text" id="url" placeholder="Tempel link video di sini..."
+                class="w-full mt-2 p-3 rounded-xl bg-black/40 border border-white/20 focus:outline-none" />
+        </div>
+
+        <button onclick="downloadVideo()"
+            class="w-full bg-white text-black font-semibold py-3 rounded-xl hover:scale-105 transition duration-300">
+            Download Sekarang
+        </button>
+
+        <div id="status" class="mt-6 text-center"></div>
+    </div>
+
+    <script>
+        feather.replace();
+
+        async function downloadVideo() {
+            const platform = document.getElementById('platform').value;
+            const format = document.getElementById('format').value;
+            const url = document.getElementById('url').value;
+            const statusDiv = document.getElementById('status');
+
+            if (!url) {
+                statusDiv.innerHTML = '<p class="text-red-400 fade-in">Masukkan link terlebih dahulu.</p>';
+                return;
+            }
+
+            statusDiv.innerHTML = `
+                <div class="flex flex-col items-center gap-4 fade-in">
+                    <div class="spinner"></div>
+                    <p class="text-sm opacity-80">Sedang mendownload...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ platform, url, format })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    statusDiv.innerHTML = '<p class="text-green-400 fade-in">Download dimulai...</p>';
+
+                    // 🔥 Auto download tanpa klik tambahan
+                    window.location.href = data.downloadUrl;
+                } else {
+                    statusDiv.innerHTML = `<p class="text-red-400 fade-in">${data.message}</p>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<p class="text-red-400 fade-in">Terjadi kesalahan server.</p>';
+            }
+        }
+    </script>
+
+</body>
+</html>
