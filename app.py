@@ -9,7 +9,7 @@ app = Flask(__name__)
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-FFMPEG_LOCATION = "/usr/bin"
+FFMPEG_LOCATION = "/usr/bin"  # Railway Linux path
 
 
 def sanitize_filename(title):
@@ -32,6 +32,7 @@ def download_video():
         return jsonify({"success": False, "message": "URL tidak ditemukan"}), 400
 
     try:
+        # Ambil judul dulu
         with yt_dlp.YoutubeDL({
             "quiet": True,
             "cookiefile": "cookies.txt"
@@ -67,19 +68,18 @@ def download_video():
                 }]
             })
 
-        # 🎬 MP4 MODE (PALING STABIL)
+        # 🎬 MP4 MODE (PAKSA MP4)
         else:
             ydl_opts.update({
-                "format": "best",
-                "postprocessors": [{
-                    "key": "FFmpegVideoConvertor",
-                    "preferedformat": "mp4"
-                }]
+                "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
+                "merge_output_format": "mp4"
             })
 
+        # Download
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
+        # Cari file hasil download
         for file in os.listdir(DOWNLOAD_FOLDER):
             if file.startswith(base_filename):
                 return jsonify({
