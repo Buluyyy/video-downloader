@@ -2,17 +2,20 @@ from flask import Flask, request, jsonify, send_from_directory
 import yt_dlp
 import os
 import re
+import uuid
 
 app = Flask(__name__)
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ✅ GANTI jika lokasi ffmpeg berbeda
-FFMPEG_LOCATION = r"C:\ffmpeg\bin"
+# 🔥 Di Railway (Docker Linux), ffmpeg ada di sini
+FFMPEG_LOCATION = "/usr/bin"
+
 
 def sanitize_filename(title):
-    return re.sub(r'[\\/*?:"<>|]', "", title)
+    title = re.sub(r'[\\/*?:"<>|]', "", title)
+    return title[:150]  # batasi panjang nama file
 
 
 @app.route("/")
@@ -30,13 +33,18 @@ def download_video():
         return jsonify({"success": False, "message": "URL tidak ditemukan"}), 400
 
     try:
-        # Ambil info video
+        # Ambil info video dulu
         with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
             info = ydl.extract_info(url, download=False)
             raw_title = info.get("title", "video")
 
         title = sanitize_filename(raw_title)
-        output_template = os.path.join(DOWNLOAD_FOLDER, f"{title}.%(ext)s")
+
+        # Tambahkan UUID supaya tidak bentrok nama file
+        unique_id = str(uuid.uuid4())[:8]
+        base_filename = f"{title}_{unique_id}"
+
+        output_template = os.path.join(DOWNLOAD_FOLDER, f"{base_filename}.%(ext)s")
 
         ydl_opts = {
             "outtmpl": output_template,
@@ -56,20 +64,20 @@ def download_video():
                 }]
             })
 
-        # 🎬 MODE MP4 (DIPAKSA MP4, BUKAN WEBM)
+        # 🎬 MODE MP4 (PAKSA MP4)
         else:
             ydl_opts.update({
                 "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
                 "merge_output_format": "mp4"
             })
 
-        # 🔥 Download
+        # 🔥 Proses download
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        # 🔎 Cari file hasil download
+        # Cari file hasil download
         for file in os.listdir(DOWNLOAD_FOLDER):
-            if file.startswith(title):
+            if file.startswith(base_filename):
                 return jsonify({
                     "success": True,
                     "downloadUrl": f"/downloads/{file}"
@@ -93,4 +101,6 @@ def serve_file(filename):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Railway pakai PORT environment variable
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
