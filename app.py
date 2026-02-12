@@ -3,34 +3,18 @@ import yt_dlp
 import os
 import re
 import uuid
-import requests
 
 app = Flask(__name__)
 
 DOWNLOAD_FOLDER = "downloads"
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-FFMPEG_LOCATION = "/usr/bin"  # Railway / Linux path
+FFMPEG_LOCATION = "/usr/bin"  # Railway Linux path
 
 
 def sanitize_filename(title):
-    """Hapus karakter illegal untuk filename"""
     title = re.sub(r'[\\/*?:"<>|]', "", title)
     return title[:150]
-
-
-def get_spotify_metadata(url):
-    """Ambil judul lagu dari Spotify track link"""
-    match = re.search(r"track/([a-zA-Z0-9]+)", url)
-    if not match:
-        return None
-    track_id = match.group(1)
-    oembed_url = f"https://open.spotify.com/oembed?url=https://open.spotify.com/track/{track_id}"
-    response = requests.get(oembed_url)
-    if response.status_code != 200:
-        return None
-    data = response.json()
-    return data.get("title")
 
 
 @app.route("/")
@@ -43,20 +27,11 @@ def download_video():
     data = request.get_json()
     url = data.get("url")
     format_type = data.get("format", "mp4")
-    platform = data.get("platform", "youtube")
 
     if not url:
         return jsonify({"success": False, "message": "URL tidak ditemukan"}), 400
 
     try:
-        # 🎵 Spotify Mode: ambil judul + search YouTube
-        if platform.lower() == "spotify":
-            spotify_title = get_spotify_metadata(url)
-            if not spotify_title:
-                return jsonify({"success": False, "message": "Gagal ambil data Spotify"}), 400
-            url = f"ytsearch1:{spotify_title}"
-            format_type = "mp3"  # Paksa MP3
-
         # Ambil judul dulu
         with yt_dlp.YoutubeDL({
             "quiet": True,
@@ -82,7 +57,8 @@ def download_video():
             "cookiefile": "cookies.txt"
         }
 
-        if format_type.lower() == "mp3":
+        # 🎵 MP3 MODE
+        if format_type == "mp3":
             ydl_opts.update({
                 "format": "bestaudio/best",
                 "postprocessors": [{
@@ -91,6 +67,8 @@ def download_video():
                     "preferredquality": "192",
                 }]
             })
+
+        # 🎬 MP4 MODE (PAKSA MP4)
         else:
             ydl_opts.update({
                 "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4",
@@ -109,18 +87,20 @@ def download_video():
                     "downloadUrl": f"/downloads/{file}"
                 })
 
-        return jsonify({"success": False, "message": "File tidak ditemukan"}), 500
+        return jsonify({
+            "success": False,
+            "message": "File tidak ditemukan"
+        }), 500
 
     except Exception as e:
-        return jsonify({"success": False, "message": f"Gagal: {str(e)}"}), 500
+        return jsonify({
+            "success": False,
+            "message": f"Gagal: {str(e)}"
+        }), 500
 
 
 @app.route("/downloads/<path:filename>")
 def serve_file(filename):
-    """Serve file safely"""
-    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
-    if not os.path.isfile(file_path):
-        return jsonify({"success": False, "message": "File tidak ditemukan"}), 404
     return send_from_directory(DOWNLOAD_FOLDER, filename, as_attachment=True)
 
 
